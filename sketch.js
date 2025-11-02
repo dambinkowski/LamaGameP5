@@ -1,31 +1,31 @@
-// LLAMA GAME (adapted for automatic zoom & centered canvas)
-//
-// Changes made:
-// - Keep original logical game resolution (GAME_W x GAME_H).
-// - Make the p5 canvas full-window and automatically compute a zoom so the
-//   logical game fills as much screen area as possible while preserving aspect.
-// - Draw the whole game world in logical coordinates and wrap it with
-//   translate(offsetX, offsetY); scale(zoom) so the game is centered + zoomed.
-// - Draw HUD (lives / score / overlay text) in screen coordinates (after pop).
-// - Small bugfix: Enemy.checkContact used `scale` (undefined) — replaced with this.scale.
-//
-// How to tune:
-// - change extraZoom in computeTargetZoom() to slightly over-zoom (1.0 = fit).
-// - change zoomLerp to control animation smoothing (0 = instant, ~0.12 smooth).
+/*
+My game project Llama Game:
 
-// logical game resolution (unchanged from original)
-const GAME_W = 1024;
-const GAME_H = 576;
+Platform extension - added functionality of floating platforms that allow player to jump on and from, helping to get over canyons,
+this extensions takes care of drawing the platforms as well as checking if player is on them.
+Enemy extension - added enemies to the game, better to avoid getting in contact with them,
+enemies move left and right and change the way they look depending on which way they going,
+also the bigger the enemy is the slower it moves, where speed and size is balanced to the gameplay itself.
+extension draws enemies, taking care of movement and checking if in contact with game character.
+Sound extension - making game play more rich with sounds, all the way from the background sound to jump sound to winning melody.
 
-// --- zoom / layout state ---
-let targetZoom = 1;
-let zoom = 1;
-const marginFraction = 0.02; // small margin around the canvas (2%)
-const zoomLerp = 0.12; // smoothing for scale transitions
-let offsetX = 0;
-let offsetY = 0;
+What I found difficult is fixing bugs. I realize how different parts of the code really effect each other the way I did not anticipate.
+Especially since I was trying to keep the part that my character to jump up instead of "teleport" I needed to rethink a lot of logic,
+platforms where a difficult part. Every time I added a sound I would not work the way I expected,
+so I had to think and find a better places to play sounds.
+I also found difficult how the draw function run in constant circle and how to work with that.
 
-// original game globals (kept)
+I learnt how to debug: using console log, or the inspector in the browser.
+I practiced how to think logically, and critically, where to put certain code.
+Doing so by creating variables, changing logical code, and adding function.
+Like I created the start game screen so when the game starts the music start.
+I also learn to use references when I don't know, or forgot how to use some command.
+
+I really enjoyed process of learning JavaScript and implementing concepts of critical thinking, logic and coding,
+by creating this video game.
+
+*/
+// global variables
 var gameChar_x;
 var gameChar_y;
 var floorPos_y;
@@ -92,75 +92,57 @@ function preload() {
 }
 
 function setup() {
-    // full-window canvas so we can scale/center the logical game inside it
-    const cnv = createCanvas(windowWidth, windowHeight);
-    cnv.parent('game-container');
-    pixelDensity(window.devicePixelRatio || 1);
-
-    // set logical floor/ground relative to logical GAME_H
-    floorPos_y = GAME_H * 3 / 4;
-    groundLevel = GAME_H * 3 / 4;
-
+    createCanvas(1024, 576);
+    floorPos_y = height * 3 / 4;
+    groundLevel = height * 3 / 4;
     lives = 3;
     startGame();
-
-    // compute initial zoom so the logical GAME_W x GAME_H fits the window
-    computeTargetZoom();
-    zoom = targetZoom;
-
     gameRendered = false;
 }
 
 function draw() {
+    // when the game is open for the first time start with welcome screen before rendering the game 
     if(!gameRendered) {
         welcomeScreen();
-        return;
+    } else  {
+        renderGame();
     }
 
-    // animate zoom smoothly
-    zoom = lerp(zoom, targetZoom, zoomLerp);
-
-    // clear whole screen (screen coords)
-    background(148, 75, 150);
-
-    // compute centered offsets (screen coords) so scaled game sits in the center
-    const scaledW = GAME_W * zoom;
-    const scaledH = GAME_H * zoom;
-    offsetX = (width - scaledW) / 2;
-    offsetY = (height - scaledH) / 2;
-
-    // draw a dark ground behind (screen coords) if you like - keep as background
-    // We'll draw the logical ground inside the scaled world below.
-
-    // Draw the entire game world inside a scaled/translated block:
-    push();
-    translate(offsetX, offsetY);
-    scale(zoom);
-
-    // Now all drawing below uses logical coordinates (0..GAME_W, 0..GAME_H)
-    // Background / world
+}
+function welcomeScreen(){
+    fill(255, 215, 0, 100);
+    rect(0,0,width,height);
+    fill(255, 215, 0, 220);
+    rect(50,50,width - 100,height-100,20);
+    fill(120,120,120,250);
+    rect(70,70,width - 140,height-140,20);
     noStroke();
-    fill(148, 75, 150); // sky (logical)
-    rect(0, 0, GAME_W, GAME_H);
+    fill(255, 215, 0);
+    textSize(60);
+    text("Welcome To LLAMA GAME !", 130, 150);
+    textSize(40);
+    text("Only you can become a hero",250 , 280)
+    text("Press Space to Start the game ! :)",200, 420);
+}
 
-    fill(15, 138, 3); // grass color
-    rect(0, groundLevel, GAME_W, GAME_H - groundLevel); // draw ground using logical coords
+function renderGame(){
+    background(148, 75, 150); //fill the sky puprle
+    noStroke();
+    fill(15, 138, 3); //grass color
+    rect(0, 432, 1024, 144); //draw some green ground
 
-    // World scroll (the original code translated by scrollPos — keep that)
     push();
     translate(scrollPos, 0);
-
     drawClouds();
     drawMountains();
     drawTrees();
     drawControllInfo();
-
     // Draw platforms
     for (var i = 0; i < platforms.length; i++) {
         platforms[i].draw();
+        //checkPlatform(platforms[i]);
         platforms[i].checkContact(gameChar_world_x, gameChar_y);
     }
-
     if(gameChar_y == groundLevel+15) { // when character is falling fall sound
         fallSound.play();
     }
@@ -200,19 +182,19 @@ function draw() {
             }
         }
     }
+    pop();
 
-    pop(); // pop the scrollPos translate
 
-    // game win / lose checks (these show overlay screens using logical coordinates)
+    // if flapgole is reached, game is win, stop backround music and draw game complete screen
     if (flagpole.isReached) {
         backgroundSound.stop();
         fill(255, 215, 0, 100); // yellow backgroud
-        rect(0,0,GAME_W,GAME_H);
+        rect(0,0,width,height);
         fill(255, 215, 0, 220); // dark yellow border
-        rect(50,50,GAME_W - 100,GAME_H-100,20);
+        rect(50,50,width - 100,height-100,20); // border
         fill(120,120,120,250); // gray inside for text
-        rect(70,70,GAME_W - 140,GAME_H-140,20);
-        flagpole = {pos_x: 740, isReached: true}; // so we can see flag in win game screen
+        rect(70,70,width - 140,height-140,20);
+        flagpole = {pos_x: 740, isReached: true}; // so we can see flag in win game screen, it will get reset to normal value when game starts anyways
         renderFlagpole();
         noStroke();
         fill(255, 215, 0);
@@ -223,19 +205,18 @@ function draw() {
         drawCollectable({pos_x: 450, pos_y: 244, scale: 0.7, isFound: false});
         text("Awesome Job !",110 , 330)
         text("Press Space to play Again :)",110, 420);
-        pop(); // pop the scale/translate before returning
         return;
     } else {
         checkFlagpole();
     }
-
+    // if run out of lives draw a game over screen
     if (lives < 1) {
         fill(255, 215, 0, 100);
-        rect(0,0,GAME_W,GAME_H);
+        rect(0,0,width,height);
         fill(255, 215, 0, 220);
-        rect(50,50,GAME_W - 100,GAME_H-100,20);
+        rect(50,50,width - 100,height-100,20);
         fill(120,120,120,250);
-        rect(70,70,GAME_W - 140,GAME_H-140,20);
+        rect(70,70,width - 140,height-140,20);
         noStroke();
         fill(255, 215, 0);
         textSize(60);
@@ -243,31 +224,30 @@ function draw() {
         textSize(40);
         text("You can do it !",350 , 280)
         text("Press Space to try Again :)",240, 420);
-        pop(); // pop scale/translate before returning
         return;
     }
+    drawLives();
+    drawScore();
 
-    // draw the player and world HUD inside scaled world
-    drawScore(); // NOTE: this previously used logical coords to draw a coin; we'll keep this inside the game area
     checkPlayerDie();
     drawGameChar();
 
-    // Movement & physics (unchanged logic)
+    // Logic to make the game character move or the background scroll.
     if (isLeft) {
-        if (gameChar_x > GAME_W * 0.2) {
+        if (gameChar_x > width * 0.2) {
             gameChar_x -= 6;
         } else {
             scrollPos += 6;
         }
     }
     if (isRight) {
-        if (gameChar_x < GAME_W * 0.6) {
+        if (gameChar_x < width * 0.6) {
             gameChar_x += 6;
         } else {
             scrollPos -= 6; // negative for moving against the background
         }
     }
-
+    // Logic to make the game character rise and fall.
     if (jumped && gameChar_y > floorPos_y - 110 && !isPlummeting) {
         gameChar_y -= 15;
         goingUp = true;
@@ -282,35 +262,10 @@ function draw() {
         goingUp = false;
     }
 
+
     // Update real position of gameChar for collision detection.
     gameChar_world_x = gameChar_x - scrollPos;
-
-    pop(); // pop the global scale/translate so HUD can be drawn in screen coords
-
-    // Draw HUD (screen coordinates)
-    drawLivesScreen();
-    drawScoreScreen();
-
-    // draw the character position diagnostics (optional)
-    // push(); fill(255); textSize(12); text(`zoom ${nf(zoom,1,2)}`, 10, height-10); pop();
 }
-
-function welcomeScreen(){
-    fill(255, 215, 0, 100);
-    rect(0,0,width,height);
-    fill(255, 215, 0, 220);
-    rect(50,50,width - 100,height-100,20);
-    fill(120,120,120,250);
-    rect(70,70,width - 140,height-140,20);
-    noStroke();
-    fill(255, 215, 0);
-    textSize(60);
-    text("Welcome To LLAMA GAME !", 130, 150);
-    textSize(40);
-    text("Only you can become a hero",250 , 280)
-    text("Press Space to Start the game ! :)",200, 420);
-}
-
 function keyPressed() {
     if (keyCode === 37 || keyCode === 65) {
         isLeft = true;
@@ -319,18 +274,19 @@ function keyPressed() {
         isRight = true;
         movingSound.loop();
     }
+    // when space bar is cliked, when it's a begining screen, or game over screen or you won screen, space bar will start the game over otherwise it controls jump and jump sound
     if ((flagpole.isReached || lives < 1) && (keyCode === 32 || keyCode === 87 || keyCode === 38)) {
         if (gameChar_y > width) {
-            winSound.stop();
-            gameoverSound.stop();
-            backgroundSound.loop();
-            lives = 4;
+            winSound.stop(); // so after quick play again player is not playing while keep hering win sound,
+            gameoverSound.stop(); // so after player losses and quickly wants to try again doesn't have to hear entire game over sound
+            backgroundSound.loop(); // play back ground music game is starting
+            lives = 4; // because it will lose one at the start
         } else {
             lives = 3;
             flagpole.isReached = false;
-            winSound.stop();
-            gameoverSound.stop();
-            backgroundSound.loop();
+            winSound.stop(); // so after quick play again player is not playing whil keep hering win sound
+            gameoverSound.stop(); // so after quick play again player is not playing whil keep hering game over sound
+            backgroundSound.loop(); // play back ground muisc game is starting
             startGame();
         }
     } else if ((keyCode === 32 || keyCode === 87 || keyCode === 38) && gameChar_y === floorPos_y) {
@@ -338,9 +294,9 @@ function keyPressed() {
         jumpSound[floor(random(0,2.99))].play();
 
         if(gameRendered == false) {
-            winSound.stop();
-            gameoverSound.stop();
-            backgroundSound.loop();
+            winSound.stop();// so after quick play again player is not playing whil keep hering win sound
+            gameoverSound.stop(); // so after quick play again player is not playing whil keep hering game over sound
+            backgroundSound.loop(); // play back ground muisc game is starting
         }
         gameRendered = true;
     }
@@ -348,24 +304,26 @@ function keyPressed() {
 function keyReleased() {
     if (keyCode === 37 || keyCode === 65) {
         isLeft = false;
-        if(!isRight)
+        if(!isRight) // fixes the bug that while right pressed click left sound stops while game char still moving
             movingSound.stop();
     } else if (keyCode === 39 || keyCode === 68) {
         isRight = false;
-        if(!isLeft)
+        if(!isLeft) // fixes the bug that while left pressed click right sound stops while game char still moving
             movingSound.stop();
     }
 }
-
+// this function stores all the level information, my game has only one level but here are the info where to draw stuff, and where enememies etc.
 function startGame() {
-    // use logical coordinates for character start
-    gameChar_x = GAME_W / 2;
+
+    gameChar_x = width / 2;
     gameChar_y = floorPos_y;
+
 
     // Variable to control the background scrolling.
     scrollPos = 0;
 
-    // Variable to store the real position of the gameChar in the game world.
+    // Variable to store the real position of the gameChar in the game
+    // world. Needed for collision detection.
     gameChar_world_x = gameChar_x - scrollPos;
 
     // Boolean variables to control the movement of the game character.
@@ -376,7 +334,8 @@ function startGame() {
     goingUp = false;
     game_score = 0;
 
-    // Initialise arrays of scenery objects (unchanged coordinates are logical)
+
+    // Initialise arrays of scenery objects
     trees_x = [100, 300, 500, 1000, 1812, 2100, 3580, 3760];
 
     clouds = [
@@ -398,7 +357,7 @@ function startGame() {
         {pos_x: 5500, pos_y: 130, scale:  0.5},
         {pos_x: 5100, pos_y: 170, scale: 1},
         {pos_x: 5960, pos_y: 250, scale: 1.1}
-    ];
+    ]
     mountains = [
         {pos_x: 300, pos_y: groundLevel, scale: 1.1},
         {pos_x: 1000, pos_y: groundLevel, scale: 0.8},
@@ -406,13 +365,13 @@ function startGame() {
         {pos_x: 2600, pos_y: groundLevel, scale: 1},
         {pos_x: 3800, pos_y: groundLevel, scale: 1},
         {pos_x: 5100, pos_y: groundLevel, scale: 1}
-    ];
+    ]
     canyons = [
         {pos_x: -760, pos_y: groundLevel, width: 600},
         {pos_x: 660, pos_y: groundLevel, width: 100},
         {pos_x: 1400, pos_y: groundLevel, width: 200},
         {pos_x: 3000, pos_y: groundLevel, width: 400}
-    ];
+    ]
     coins = [
         {pos_x: 400, pos_y: groundLevel, scale: 0.7, isFound: false},
         {pos_x: 860, pos_y: groundLevel, scale: 0.7, isFound: false},
@@ -426,12 +385,13 @@ function startGame() {
         {pos_x: 3974, pos_y: groundLevel - 100, scale: 0.7, isFound: false},
         {pos_x: 4148, pos_y: groundLevel - 125, scale: 0.7, isFound: false},
         {pos_x: 4327, pos_y: groundLevel - 195, scale: 0.7, isFound: false},
+        {pos_x: 4862, pos_y: groundLevel, scale: 3, isFound: false}, // big coin worth more so draw it 5 times
         {pos_x: 4862, pos_y: groundLevel, scale: 3, isFound: false},
         {pos_x: 4862, pos_y: groundLevel, scale: 3, isFound: false},
         {pos_x: 4862, pos_y: groundLevel, scale: 3, isFound: false},
         {pos_x: 4862, pos_y: groundLevel, scale: 3, isFound: false},
-        {pos_x: 4862, pos_y: groundLevel, scale: 3, isFound: false}
-    ];
+
+    ]
     platforms = [];
     platforms.push(createPlatforms(1000, groundLevel-75,120));
     platforms.push(createPlatforms(3050, groundLevel-75,140));
@@ -439,26 +399,358 @@ function startGame() {
     platforms.push(createPlatforms(4080, groundLevel-125,140));
     platforms.push(createPlatforms(4250, groundLevel-195,140));
 
+
     enemies = [];
     enemies.push(new Enemy(-100, groundLevel-80, 150,0.4,false));
+    //enemies.push(new Enemy(800, groundLevel-40, 150, 0.2,false)); //comment this out to make game harder
     enemies.push(new Enemy(820, groundLevel-40, 480, 0.2,false));
+    //enemies.push(new Enemy(1000, groundLevel-40, 400, 0.2,false)); //comment this out to make game harder
     enemies.push(new Enemy(1750, groundLevel-40, 300, 0.2,false));
     enemies.push(new Enemy(2207, groundLevel-40, 500, 0.2,false));
+    //enemies.push(new Enemy(2100, groundLevel-20, 900,0.1,false));//comment this out to make game harder
     enemies.push(new Enemy(4427, groundLevel-140, 400, 0.7,false));
     flagpole = {pos_x: 5000, isReached: false}; // 5000
 }
-
 function drawGameChar() {
-    // unchanged body drawing but gameChar_x/gameChar_y are logical coords
-    // ... (the entire original drawGameChar content remains here unchanged) ...
-    // to keep file concise I left actual drawing logic unchanged from your original code
-    // (you can paste your original drawGameChar body here unchanged).
-    // For completeness in your real file keep the full original drawGameChar implementation.
-    // ----
-    // (Note: in this provided version we'll call your original drawGameChar code.)
-    // ----
-}
+    if (isLeft && isFalling) {
+        // add your jumping-left code
+        noStroke();
 
+        fill(34, 227, 227);
+        ellipse(gameChar_x - 4.5, gameChar_y - 20,
+            30, 17); // body front
+        ellipse(gameChar_x + 7.5, gameChar_y - 19,
+            30, 21.25); // body back
+        ellipse(gameChar_x - 12.5, gameChar_y - 28.5,
+            22.5); //neck
+        rect(gameChar_x - 21.25, gameChar_y - 51.5,
+            16.25, 16.25, 29); // head
+
+        fill(26, 201, 201);
+        rect(gameChar_x - 25, gameChar_y - 42.75,
+            10, 6.25, 20); // mouth
+        quad(gameChar_x + 13.75, gameChar_y - 10.5,
+            gameChar_x + 6.5, gameChar_y - 10.5,
+            gameChar_x + 16, gameChar_y,
+            gameChar_x + 23.25, gameChar_y); // back leg
+        quad(gameChar_x - 7, gameChar_y - 15,
+            gameChar_x - 8, gameChar_y - 11,
+            gameChar_x - 18, gameChar_y - 14,
+            gameChar_x - 19, gameChar_y - 19); // front leg
+        quad(gameChar_x - 19, gameChar_y - 19,
+            gameChar_x - 15, gameChar_y - 6,
+            gameChar_x - 20, gameChar_y - 7,
+            gameChar_x - 22.5, gameChar_y - 20);
+        triangle(gameChar_x - 4.5, gameChar_y - 56.25,
+            gameChar_x - 6.75, gameChar_y - 48.75,
+            gameChar_x - 11.5, gameChar_y - 49) // ears
+        triangle(gameChar_x + 15.25, gameChar_y - 25.25,
+            gameChar_x + 23, gameChar_y - 27,
+            gameChar_x + 23.75, gameChar_y - 34.25); // tail
+        stroke(0);
+        line(gameChar_x - 17.25, gameChar_y - 40,
+            gameChar_x - 24.75, gameChar_y - 40); // lips
+        fill(255);
+        arc(gameChar_x - 16.5, gameChar_y - 46,
+            5, 5, -1, 3, CHORD); // eye
+        fill(235, 32, 14);
+        ellipse(gameChar_x - 16.75, gameChar_y - 45.25,
+            2.5, 2.5); // iris
+        quad(gameChar_x - 18, gameChar_y - 35,
+            gameChar_x + 14, gameChar_y - 42.75,
+            gameChar_x + 19, gameChar_y - 32.75,
+            gameChar_x + 13, gameChar_y - 23); // cape
+
+        noStroke();
+        fill(252, 240, 3);
+        quad(gameChar_x + 3.75, gameChar_y - 39.25,
+            gameChar_x + 3.75, gameChar_y - 28.5,
+            gameChar_x - 1.25, gameChar_y - 30.25,
+            gameChar_x - 1.25, gameChar_y - 38);    // on the cape
+        triangle(gameChar_x + 3.75, gameChar_y - 39.25,
+            gameChar_x + 3.75, gameChar_y - 28.5,
+            gameChar_x + 14.25, gameChar_y - 34); // on the cape
+        fill(222, 172, 9);
+        rect(gameChar_x - 0.5, gameChar_y - 36.5,
+            7.5, 2.5, 2.5) // letter L
+        rect(gameChar_x + 6, gameChar_y - 36.5,
+            2.5, 6.25, 2.5) // letter L
+
+    } else if (isRight && isFalling) {
+        // add your jumping-right code
+        noStroke();
+        fill(34, 227, 227)
+        ellipse(gameChar_x + 4.5, gameChar_y - 20, 30, 16.5) // body front
+        ellipse(gameChar_x - 7.5, gameChar_y - 19, 30, 21.25) // body back
+        ellipse(gameChar_x + 12.5, gameChar_y - 28.5, 22.5) //neck
+        rect(gameChar_x + 5, gameChar_y - 51.5, 16.25, 16.25, 29) // head
+
+        fill(26, 201, 201);
+        rect(gameChar_x + 15, gameChar_y - 42.75,
+            10, 6.25, 20); // mouth
+        quad(gameChar_x - 13.75, gameChar_y - 10.5,
+            gameChar_x - 6.5, gameChar_y - 10.5,
+            gameChar_x - 16, gameChar_y,
+            gameChar_x - 23.25, gameChar_y); // back leg
+        quad(gameChar_x + 7, gameChar_y - 15,
+            gameChar_x + 8, gameChar_y - 11,
+            gameChar_x + 18, gameChar_y - 14,
+            gameChar_x + 19, gameChar_y - 19); // front leg
+        quad(gameChar_x + 19, gameChar_y - 19,
+            gameChar_x + 15, gameChar_y - 6,
+            gameChar_x + 20, gameChar_y - 7,
+            gameChar_x + 22.5, gameChar_y - 20);
+        triangle(gameChar_x + 4.5, gameChar_y - 56.25,
+            gameChar_x + 6.75, gameChar_y - 48.75,
+            gameChar_x + 11.5, gameChar_y - 49) // ears
+        triangle(gameChar_x - 15.25, gameChar_y - 25.25,
+            gameChar_x - 23, gameChar_y - 27,
+            gameChar_x - 23.75, gameChar_y - 34.25); // tail
+
+        stroke(0);
+        line(gameChar_x + 17.25, gameChar_y - 40,
+            gameChar_x + 24.75, gameChar_y - 40); // lips
+        fill(255);
+        arc(gameChar_x + 16.5, gameChar_y - 46,
+            5, 5, 0, PI + QUARTER_PI, CHORD); // eye
+        fill(235, 32, 14);
+        ellipse(gameChar_x + 16.75, gameChar_y - 45.25,
+            2.5, 2.5); // iris
+        quad(gameChar_x + 18, gameChar_y - 35,
+            gameChar_x - 14, gameChar_y - 42.75,
+            gameChar_x - 19, gameChar_y - 32.75,
+            gameChar_x - 13, gameChar_y - 23); // cape
+
+        noStroke();
+        fill(252, 240, 3);
+        quad(gameChar_x - 3.75, gameChar_y - 39.25,
+            gameChar_x - 3.75, gameChar_y - 28.5,
+            gameChar_x + 1.25, gameChar_y - 30.25,
+            gameChar_x + 1.25, gameChar_y - 38);    // on the cape
+        triangle(gameChar_x - 3.75, gameChar_y - 39.25,
+            gameChar_x - 3.75, gameChar_y - 28.5,
+            gameChar_x - 14.25, gameChar_y - 34); // on the cape
+        fill(222, 172, 9);
+        rect(gameChar_x - 7.5, gameChar_y - 36.5,
+            7.5, 2.5, 2.5) // letter L
+        rect(gameChar_x - 7.5, gameChar_y - 36.5,
+            2.5, 6.25, 2.5) // letter L
+
+    } else if (isLeft) {
+        // add your walking left code
+        noStroke();
+        fill(34, 227, 227);
+        ellipse(gameChar_x - 4.5, gameChar_y - 20,
+            30, 22.5); // body front
+        ellipse(gameChar_x + 7.5, gameChar_y - 19,
+            30, 21.25); // body back
+        ellipse(gameChar_x - 12.5, gameChar_y - 28.5,
+            22.5); //neck
+        rect(gameChar_x - 21.25, gameChar_y - 51.5,
+            16.25, 16.25, 29); // head
+
+        fill(26, 201, 201);
+        rect(gameChar_x - 25, gameChar_y - 42.75,
+            10, 6.25, 20); // mouth
+        quad(gameChar_x + 13.75, gameChar_y - 10.5,
+            gameChar_x + 6.5, gameChar_y - 10.5,
+            gameChar_x + 16, gameChar_y,
+            gameChar_x + 23.25, gameChar_y); // back leg
+        quad(gameChar_x - 3.75, gameChar_y - 10.5,
+            gameChar_x - 11, gameChar_y - 10.5,
+            gameChar_x - 1.5, gameChar_y,
+            gameChar_x + 6.75, gameChar_y); // front leg
+        triangle(gameChar_x - 4.5, gameChar_y - 56.25,
+            gameChar_x - 6.75, gameChar_y - 48.75,
+            gameChar_x - 11.5, gameChar_y - 49) // ears
+        triangle(gameChar_x + 15.25, gameChar_y - 25.25,
+            gameChar_x + 23, gameChar_y - 27,
+            gameChar_x + 23.75, gameChar_y - 34.25); // tail
+        stroke(0);
+        line(gameChar_x - 17.25, gameChar_y - 40,
+            gameChar_x - 24.75, gameChar_y - 40); // lips
+        fill(255);
+        arc(gameChar_x - 16.5, gameChar_y - 46,
+            5, 5, -1, 3, CHORD); // eye
+        fill(235, 32, 14);
+        ellipse(gameChar_x - 16.75, gameChar_y - 45.25,
+            2.5, 2.5); // iris
+        quad(gameChar_x - 18, gameChar_y - 35,
+            gameChar_x + 14, gameChar_y - 42.75,
+            gameChar_x + 19, gameChar_y - 32.75,
+            gameChar_x + 13, gameChar_y - 23); // cape
+
+        noStroke();
+        fill(252, 240, 3);
+        quad(gameChar_x + 3.75, gameChar_y - 39.25,
+            gameChar_x + 3.75, gameChar_y - 28.5,
+            gameChar_x - 1.25, gameChar_y - 30.25,
+            gameChar_x - 1.25, gameChar_y - 38);    // on the cape
+        triangle(gameChar_x + 3.75, gameChar_y - 39.25,
+            gameChar_x + 3.75, gameChar_y - 28.5,
+            gameChar_x + 14.25, gameChar_y - 34); // on the cape
+        fill(222, 172, 9);
+        rect(gameChar_x - 0.5, gameChar_y - 36.5,
+            7.5, 2.5, 2.5) // letter L
+        rect(gameChar_x + 6, gameChar_y - 36.5,
+            2.5, 6.25, 2.5) // letter L
+    } else if (isRight) {
+        noStroke();
+        fill(34, 227, 227);
+        ellipse(gameChar_x + 4.5, gameChar_y - 20,
+            30, 22.5); // body front
+        ellipse(gameChar_x - 7.5, gameChar_y - 19,
+            30, 21.25); // body back
+        ellipse(gameChar_x + 12.5, gameChar_y - 28.5,
+            22.5); //neck
+        rect(gameChar_x + 5, gameChar_y - 51.5,
+            16.25, 16.25, 29); // head
+
+        fill(26, 201, 201);
+        rect(gameChar_x + 15, gameChar_y - 42.75,
+            10, 6.25, 20); // mouth
+        quad(gameChar_x - 13.75, gameChar_y - 10.5,
+            gameChar_x - 6.5, gameChar_y - 10.5,
+            gameChar_x - 16, gameChar_y,
+            gameChar_x - 23.25, gameChar_y); // back leg
+        quad(gameChar_x + 3.75, gameChar_y - 10.5,
+            gameChar_x + 11, gameChar_y - 10.5,
+            gameChar_x + 1.5, gameChar_y,
+            gameChar_x - 6.75, gameChar_y); // front leg
+        triangle(gameChar_x + 4.5, gameChar_y - 56.25,
+            gameChar_x + 6.75, gameChar_y - 48.75,
+            gameChar_x + 11.5, gameChar_y - 49) // ears
+        triangle(gameChar_x - 15.25, gameChar_y - 25.25,
+            gameChar_x - 23, gameChar_y - 27,
+            gameChar_x - 23.75, gameChar_y - 34.25); // tail
+
+        stroke(0);
+        line(gameChar_x + 17.25, gameChar_y - 40,
+            gameChar_x + 24.75, gameChar_y - 40); // lips
+        fill(255);
+        arc(gameChar_x + 16.5, gameChar_y - 46,
+            5, 5, 0, PI + QUARTER_PI, CHORD); // eye
+        fill(235, 32, 14);
+        ellipse(gameChar_x + 16.75, gameChar_y - 45.25,
+            2.5, 2.5); // iris
+        quad(gameChar_x + 18, gameChar_y - 35,
+            gameChar_x - 14, gameChar_y - 42.75,
+            gameChar_x - 19, gameChar_y - 32.75,
+            gameChar_x - 13, gameChar_y - 23); // cape
+
+        noStroke();
+        fill(252, 240, 3);
+        quad(gameChar_x - 3.75, gameChar_y - 39.25,
+            gameChar_x - 3.75, gameChar_y - 28.5,
+            gameChar_x + 1.25, gameChar_y - 30.25,
+            gameChar_x + 1.25, gameChar_y - 38);    // on the cape
+        triangle(gameChar_x - 3.75, gameChar_y - 39.25,
+            gameChar_x - 3.75, gameChar_y - 28.5,
+            gameChar_x - 14.25, gameChar_y - 34); // on the cape
+        fill(222, 172, 9);
+        rect(gameChar_x - 7.5, gameChar_y - 36.5,
+            7.5, 2.5, 2.5) // letter L
+        rect(gameChar_x - 7.5, gameChar_y - 36.5,
+            2.5, 6.25, 2.5) // letter L
+    } else if (isFalling || isPlummeting) {
+        // add your jumping facing forwards code
+        stroke(0)
+        fill(235, 32, 14)
+        quad(gameChar_x - 7.75, gameChar_y - 36.5,
+            gameChar_x + 3.75, gameChar_y - 36.5,
+            gameChar_x + 17, gameChar_y - 60,
+            gameChar_x - 20, gameChar_y - 60); // cape
+
+        noStroke();
+        fill(34, 227, 227);   //bright blue
+        rect(gameChar_x - 14, gameChar_y - 22.5, 25, 20, 36);  // body
+        ellipse(gameChar_x - 1.75, gameChar_y - 26.25, 15, 25);  // neck
+        ellipse(gameChar_x - 2, gameChar_y - 41.25, 13.75, 13.75);  // head
+        fill(235, 32, 50,)
+        rect(gameChar_x - 7.5, gameChar_y - 36, 11.25, 1.25)
+
+
+        stroke(0)
+        fill(255, 255, 255)  //white
+        ellipse(gameChar_x - 4.5, gameChar_y - 43.25, 2.5, 2.5)  // eye
+        ellipse(gameChar_x + 0.5, gameChar_y - 43.25, 2.5, 2.5)  // eye
+        noStroke();
+        fill(26, 201, 201)  // dark blue
+        triangle(gameChar_x - 4.5, gameChar_y - 46.25,
+            gameChar_x - 7.5, gameChar_y - 48.25,
+            gameChar_x - 4.5, gameChar_y - 53.75) // ear
+        quad(gameChar_x + 0.5, gameChar_y - 46.5,
+            gameChar_x + 1.25, gameChar_y - 49.75,
+            gameChar_x + 5, gameChar_y - 50.5,
+            gameChar_x - 0.75, gameChar_y - 52.5)  // ear
+        quad(gameChar_x - 8, gameChar_y - 11,
+            gameChar_x - 5, gameChar_y - 6,
+            gameChar_x - 20, gameChar_y,
+            gameChar_x - 23, gameChar_y - 5) // leg
+        quad(gameChar_x + 5, gameChar_y - 11,
+            gameChar_x + 2, gameChar_y - 6,
+            gameChar_x + 20, gameChar_y,
+            gameChar_x + 24, gameChar_y - 5)  // right leg
+        ellipse(gameChar_x - 20, gameChar_y - 3, 6)
+        ellipse(gameChar_x + 5, gameChar_y - 8, 6)
+        rect(gameChar_x - 5.75, gameChar_y - 40.75,
+            7.5, 4.25, 20)  // mouth
+        stroke(0);
+        line(gameChar_x - 4.75, gameChar_y - 38.75,
+            gameChar_x + 0.75, gameChar_y - 38.75) // mouth
+        noStroke();
+        fill(0, 0, 0)
+        ellipse(gameChar_x - 5, gameChar_y - 43.25, 1.25, 1.25)   // iris
+        ellipse(gameChar_x + 1, gameChar_y - 43.25, 1.25, 1.5)  // iris
+    } else {
+        // add your standing front facing code
+        stroke(0);
+        fill(235, 32, 14); // red
+        quad(gameChar_x - 7.75, gameChar_y - 46.5,
+            gameChar_x + 3.75, gameChar_y - 46.5,
+            gameChar_x + 15.25, gameChar_y - 29.5,
+            gameChar_x - 18.25, gameChar_y - 29.5);  //cape
+        noStroke();
+        fill(34, 227, 227);  //bright blue
+        rect(gameChar_x - 14, gameChar_y - 32.5,
+            25, 20, 36);  //body
+        ellipse(gameChar_x - 1.75, gameChar_y - 36.25,
+            15, 25);  //neck
+        ellipse(gameChar_x - 2, gameChar_y - 51.25,
+            13.75, 13.75);  //head
+        fill(235, 32, 50); // red
+        rect(gameChar_x - 7.5, gameChar_y - 46,
+            11.25, 1.25); // cape on the neck
+        fill(26, 201, 201);  // dark blue
+        triangle(gameChar_x - 4.5, gameChar_y - 56.25,
+            gameChar_x - 7.5, gameChar_y - 58.25,
+            gameChar_x - 4.5, gameChar_y - 63.75); //ear
+        quad(gameChar_x + 0.5, gameChar_y - 56.5,
+            gameChar_x + 1.25, gameChar_y - 59.75,
+            gameChar_x + 5, gameChar_y - 60.5,
+            gameChar_x - 0.75, gameChar_y - 62.5);  //ear
+        rect(gameChar_x - 10.25, gameChar_y - 17.5,
+            6.25, 17.5, 20);   //leg
+        rect(gameChar_x + 1.25, gameChar_y - 17.5,
+            6.25, 17.5, 20);  //leg
+        rect(gameChar_x - 5.75, gameChar_y - 50.75,
+            7.5, 4.25, 20);  //mouth
+        stroke(0);
+        fill(255);  //white
+        ellipse(gameChar_x - 4.5, gameChar_y - 53.25,
+            2.5, 2.5);  //eye
+        ellipse(gameChar_x + 0.5, gameChar_y - 53.25,
+            2.5, 2.5);  //eye
+        line(gameChar_x - 4.75, gameChar_y - 48.75,
+            gameChar_x + 0.75, gameChar_y - 48.75); //mouth
+        noStroke();
+        fill(0);
+        ellipse(gameChar_x - 5, gameChar_y - 53.25,
+            1.25, 1.25);   //iris
+        ellipse(gameChar_x + 1, gameChar_y - 53.25,
+            1.25, 1.5);  //iris
+    }
+}
 function drawClouds() {
     noStroke();
     for (var i = 0; i < clouds.length; i++) {
@@ -479,7 +771,38 @@ function drawMountains() {
         triangle(mountains[i].pos_x, mountains[i].pos_y - 300 * mountains[i].scale,
             mountains[i].pos_x - 100, mountains[i].pos_y,
             mountains[i].pos_x + 100, mountains[i].pos_y - 50 * mountains[i].scale);
-        // ... rest unchanged ...
+        fill(180); // light gray, big mountain base
+        triangle(mountains[i].pos_x - 102 * mountains[i].scale, mountains[i].pos_y - 330 * mountains[i].scale,
+            mountains[i].pos_x - 235 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x + 300 * mountains[i].scale, mountains[i].pos_y);
+        fill(255); // white, big mountain top
+        triangle(mountains[i].pos_x - 145 * mountains[i].scale, mountains[i].pos_y - 223 * mountains[i].scale,
+            mountains[i].pos_x - 102 * mountains[i].scale, mountains[i].pos_y - 330 * mountains[i].scale,
+            mountains[i].pos_x - 21 * mountains[i].scale, mountains[i].pos_y - 265 * mountains[i].scale)
+        fill(0, 0, 0, 50); // shade for big mountain
+        triangle(mountains[i].pos_x - 102 * mountains[i].scale, mountains[i].pos_y - 330 * mountains[i].scale,
+            mountains[i].pos_x - 235 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x + 75 * mountains[i].scale, mountains[i].pos_y);
+        fill(136, 138, 137); // small mountain gray
+        triangle(mountains[i].pos_x + 50 * mountains[i].scale, mountains[i].pos_y - 247 * mountains[i].scale,
+            mountains[i].pos_x + 198 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x - 179 * mountains[i].scale, mountains[i].pos_y);
+        fill(255, 255, 255) // small mountain white top
+        triangle(mountains[i].pos_x + 50 * mountains[i].scale, mountains[i].pos_y - 247 * mountains[i].scale,
+            mountains[i].pos_x - 51 * mountains[i].scale, mountains[i].pos_y - 139 * mountains[i].scale,
+            mountains[i].pos_x + 98 * mountains[i].scale, mountains[i].pos_y - 168 * mountains[i].scale)
+        fill(0, 0, 0, 50); // small mountain shade
+        triangle(mountains[i].pos_x + 50 * mountains[i].scale, mountains[i].pos_y - 247 * mountains[i].scale,
+            mountains[i].pos_x + 119 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x - 179 * mountains[i].scale, mountains[i].pos_y);
+        // shade on the ground from small mountain
+        triangle(mountains[i].pos_x - 235 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x - 494 * mountains[i].scale, mountains[i].pos_y + 348 * mountains[i].scale,
+            mountains[i].pos_x + 116 * mountains[i].scale, mountains[i].pos_y);
+        fill(0, 0, 0, 30); // shade on the ground from big mountain
+        triangle(mountains[i].pos_x + 116 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x + 299 * mountains[i].scale, mountains[i].pos_y,
+            mountains[i].pos_x - 420 * mountains[i].scale, mountains[i].pos_y + 305 * mountains[i].scale);
     }
 }
 function drawTrees() {
@@ -490,18 +813,86 @@ function drawTrees() {
             groundLevel - 100,
             25, 100); // tree base
         fill(random(65,75), 140, random(7,25)); // darker green color for tree
-        // ... rest unchanged ...
+
+        var tree_points = [ // on the left are x, on the right are y
+            0, -43,
+            -20, -51,
+            -38, -73,
+            -54, -80,
+            -58, -87,
+            -66, -91,
+            -68, -93,
+            -69, -96,
+            -69, -98,
+            -68, -102,
+            -67, -106,
+            -66, -109,
+            -64, -114,
+            -59, -119,
+            -55, -126,
+            -50, -131,
+            -45, -137,
+            -40, -145,
+            -35, -153,
+            -30, -161,
+            -25, -169,
+            -20, -187,
+            -15, -195,
+            -10, -200,
+            -5, -208,
+            0, -216,
+            0, -43,
+            20, -51,
+            38, -73,
+            54, -80,
+            58, -87,
+            66, -91,
+            68, -93,
+            69, -96,
+            69, -98,
+            68, -102,
+            67, -106,
+            66, -109,
+            64, -114,
+            59, -119,
+            55, -126,
+            50, -131,
+            45, -137,
+            40, -145,
+            35, -153,
+            30, -161,
+            25, -169,
+            20, -187,
+            15, -195,
+            10, -200,
+            5, -208,
+            0, -216];
+
+        beginShape(); // start of top of the tree
+        for(var j = 0; j < tree_points.length; j+= 2) {
+            vertex(trees_x[i] + tree_points[j], groundLevel + tree_points[j + 1]);
+        }
+        endShape();
+
+        fill(0, 0, 0, 50); // tree shadow
+        triangle(trees_x[i] - 10, 432,
+            trees_x[i] + 10, 432,
+            trees_x[i] - 90, 494);
     }
 }
 function drawLives() {
-    // unused: HUD will be drawn in screen coords instead (drawLivesScreen below)
+    noStroke();
+    fill(235, 38, 38); // red for harts
+    for (var i = 0; i < lives; i++) {
+        ellipse(i * 50 + 25, 25, 25, 25);
+        ellipse(i * 50 + 48, 25, 25, 25);
+        triangle(i * 50 + 14, 30, i * 50 + 37, 60, i * 50 + 59, 30)
+    }
 }
 function drawScore() {
-    // Keep a small score coin inside the playable area (logical coords)
-    push();
+    push(); // so text size doesn't change anywhere else
     drawCollectable({pos_x: 250, pos_y: 45, scale: 0.5}); // this will make fill yellow
     textSize(50)
-    fill(255);
     text(game_score, 280, 50);
     pop();
 }
@@ -509,26 +900,27 @@ function drawCanyon(t_canyon) {
     noStroke();
     fill(148, 75, 150); // color of the background so it has a hole effect
     rect(t_canyon.pos_x, t_canyon.pos_y,
-        t_canyon.width, groundLevel); // canyon (logical coords)
+        t_canyon.width, groundLevel); // canyon
 }
 function checkCanyon(t_canyon) {
     if (gameChar_world_x > t_canyon.pos_x &&
         gameChar_world_x < t_canyon.pos_x + t_canyon.width &&
         gameChar_y >= groundLevel) {
-        isLeft = false;
-        isRight = false;
+        isLeft = false; // so can't move when falling out of the canyon
+        isRight = false; // so can't move when falling out of the canyon
         return true;
     }
 }
 function drawCollectable(t_collectable) {
     fill(255, 215, 0); // darker yellow for outline
     ellipse(t_collectable.pos_x, t_collectable.pos_y, 40*t_collectable.scale, 10*t_collectable.scale) // foundation
-    ellipse(t_collectable.pos_x, t_collectable.pos_y - 30 * t_collectable.scale,
+    ellipse(t_collectable.pos_x, t_collectable.pos_y - 30 * t_collectable.scale, // big circle
         60 * t_collectable.scale, 60 * t_collectable.scale);
     fill(255, 165, 0); // much darker yellow for inner cicrle
     ellipse(t_collectable.pos_x, t_collectable.pos_y - 30 * t_collectable.scale,
         48 * t_collectable.scale, 48 * t_collectable.scale);
     fill(255, 255, 0); // yellow for the star on the coin
+    // coin star is made from those 3 triangles:
     triangle(t_collectable.pos_x - 15 * t_collectable.scale, t_collectable.pos_y - 17 * t_collectable.scale,
         t_collectable.pos_x, t_collectable.pos_y - 47 * t_collectable.scale,
         t_collectable.pos_x, t_collectable.pos_y - 25 * t_collectable.scale);
@@ -541,15 +933,16 @@ function drawCollectable(t_collectable) {
 }
 function checkCollectable(t_collectable) {
     if (dist(gameChar_world_x, gameChar_y, t_collectable.pos_x, t_collectable.pos_y) < 42 * t_collectable.scale &&
-        t_collectable.isFound == false) {
+        t_collectable.isFound == false) { // this function is called many times so I had to add && isFound == false
         coinSound.play();
-        t_collectable.isFound = true;
+        t_collectable.isFound = true;     // for the score counter to work
         game_score += 1;
     }
-    if (!t_collectable.isFound)
+    if (!t_collectable.isFound) // when coin not found good to draw it
         return true;
-    else
+    else {
         return false;
+    }
 }
 function renderFlagpole() {
     push();
@@ -557,6 +950,7 @@ function renderFlagpole() {
     stroke(255);
     line(flagpole.pos_x, groundLevel, flagpole.pos_x, groundLevel - 300);
     noStroke();
+
 
     if (flagpole.isReached) {
         fill(235, 32, 14); // red flag
@@ -580,17 +974,16 @@ function checkFlagpole() {
     }
 }
 function checkPlayerDie() {
-    if (gameChar_y > GAME_W) { // if fell - NOTE: original used width; keep a fallback
+    if (gameChar_y > width) { // if felt - 1 life
         lives -= 1;
         if (lives >= 1) {
-            startGame();
+            startGame(); // if still has enough lifes to continue start over
         } else {
             backgroundSound.stop();
-            gameoverSound.play();
+            gameoverSound.play(); // if not enough lifes play game over sound, sound is here so it only playes once
         }
     }
 }
-
 function createPlatforms(x, y, length){
     var p = {
         x: x,
@@ -605,21 +998,20 @@ function createPlatforms(x, y, length){
                 gc_x < this.x + this.length &&
                 gc_y == this.y &&
                 !goingUp) {
-                floorPos_y = this.y;
+                floorPos_y = this.y // jump depends on the floor pos if jumped from the platform change how much can jump up
             } else if (( gc_x > this.x - 500 && gc_x < this.x + this.length + 500)&&(gc_x < this.x || gc_x > this.x + this.length) &&
                 gc_y == this.y)
-                floorPos_y = groundLevel;
+                floorPos_y = groundLevel; // when landing on the ground floor pos is ground level which is height *3/4 of the screen
         }
     }
     return p;
 }
-
 function Enemy(x, y, range, scale,left){
     this.x = x;
     this.y = y;
     this.range = range;
     this.scale = scale;
-    this.left = left;
+    this.left = left
 
     this.currentX = x;
     this.inc = 1 / this.scale * 0.5;
@@ -627,10 +1019,10 @@ function Enemy(x, y, range, scale,left){
     this.update = function (){
         this.currentX += this.inc;
         if(this.currentX >= this.x + this.range){
-            this.inc = - 1 / this.scale * 0.5;
+            this.inc = - 1 / this.scale * 0.5; // this part relates to fact that the bigger enemy is slower it moves
             this.left = true;
         } else if(this.currentX < this.x) {
-            this.inc = 1 / this.scale * 0.5;
+            this.inc = 1 / this.scale * 0.5; // this part relates to fact that the bigger enemy is slower it moves
             this.left = false;
         }
     }
@@ -640,25 +1032,126 @@ function Enemy(x, y, range, scale,left){
             fill(235, 23, 23) // red
             ellipse(this.currentX, this.y - 49 * this.scale, 65 * this.scale)    //head
             rect(this.currentX - 40 * this.scale, this.y - 20 * this.scale,
-                80 * this.scale, 66 * this.scale, 15, 8, 0, 15)
-            // ... rest unchanged ...
+                80 * this.scale, 66 * this.scale, 15, 8, 0, 15)   //chest 8 15 15 0
+            quad(this.currentX + 40 * this.scale, this.y + 41 * this.scale,
+                this.currentX - 32 * this.scale, this.y + 41 * this.scale,
+                this.currentX - 16 * this.scale, this.y + 98 * this.scale,
+                this.currentX + 40 * this.scale, this.y + 98 * this.scale)   //stomach
+            fill(22, 65, 99) // blue
+            quad(this.currentX - 16 * this.scale, this.y + 98 * this.scale,
+                this.currentX - 24 * this.scale, this.y + 155 * this.scale,
+                this.currentX + 1 * this.scale, this.y + 155 * this.scale,
+                this.currentX + 40 * this.scale, this.y + 98 * this.scale)   //thigh
+            quad(this.currentX - 24 * this.scale, this.y + 155 * this.scale,
+                this.currentX + 3 * this.scale, this.y + 210 * this.scale,
+                this.currentX + 7 * this.scale, this.y + 210 * this.scale,
+                this.currentX + 1 * this.scale, this.y + 155 * this.scale)   //calf
+            fill(89, 59, 19)
+            quad(this.currentX + 40 * this.scale, this.y + 83 * this.scale,
+                this.currentX - 23 * this.scale, this.y + 83 * this.scale,
+                this.currentX - 14 * this.scale, this.y + 100 * this.scale,
+                this.currentX + 40 * this.scale, this.y + 100 * this.scale)   //belt
+            fill(161, 50, 50)
+            rect(this.currentX - 45 * this.scale, this.y - 46 * this.scale,
+                30 * this.scale, 20 * this.scale, 0, 20, 5, 20)   //chin
+            fill(255)
+            arc(this.currentX - 10 * this.scale, this.y - 63 * this.scale,
+                20 * this.scale, 20 * this.scale, 0, PI + QUARTER_PI, OPEN)  //eye
+            rect(this.currentX - 43 * this.scale, this.y - 39 * this.scale,
+                20 * this.scale, 7 * this.scale, 10, 10, 10, 0)   //teeth
+            fill(0)
+            ellipse(this.currentX - 12 * this.scale, this.y - 60 * this.scale, 10 * this.scale)    //iris
+            quad(this.currentX + 9 * this.scale, this.y - 67 * this.scale,
+                this.currentX + 16 * this.scale, this.y - 53 * this.scale,
+                this.currentX + 61 * this.scale, this.y - 62 * this.scale,
+                this.currentX + 55 * this.scale, this.y - 70 * this.scale)   //horn
+            triangle(this.currentX + 55 * this.scale, this.y - 70 * this.scale,
+                this.currentX + 20 * this.scale, this.y - 122 * this.scale,
+                this.currentX + 37 * this.scale, this.y - 66 * this.scale)     //horn
+            quad(this.currentX + 3 * this.scale, this.y + 210 * this.scale,
+                this.currentX - 20 * this.scale, this.y + 218 * this.scale,
+                this.currentX + 15 * this.scale, this.y + 218 * this.scale,
+                this.currentX + 7 * this.scale, this.y + 210 * this.scale)   //foot
+
+
+            fill(181, 42, 42)
+            rect(this.currentX - 10 * this.scale, this.y - 8 * this.scale,
+                30 * this.scale, 50 * this.scale, 10, 10, 0, 0)    //hand
+            quad(this.currentX - 14 * this.scale, this.y + 37 * this.scale,
+                this.currentX - 57 * this.scale, this.y + 53 * this.scale,
+                this.currentX - 50 * this.scale, this.y + 64 * this.scale,
+                this.currentX + 17 * this.scale, this.y + 43 * this.scale)    //hand
+            fill(138, 41, 41)
+            rect(this.currentX - 65 * this.scale, this.y + 52 * this.scale,
+                15 * this.scale, 15 * this.scale, 5)    //palm
         } else {
             fill(235, 23, 23) // red
             ellipse(this.currentX,this.y - 49 * this.scale, 65 * this.scale)    //head
             rect(this.currentX - 40 * this.scale, this.y - 20 * this.scale,
-                80 * this.scale, 66 * this.scale, 8, 15, 15, 0)
-            // ... rest unchanged ...
+                80 * this.scale, 66 * this.scale, 8, 15, 15, 0)   //chest
+            quad(this.currentX - 40 * this.scale, this.y + 41 * this.scale,
+                this.currentX + 32 * this.scale, this.y + 41 * this.scale,
+                this.currentX + 16 * this.scale, this.y + 98 * this.scale,
+                this.currentX - 40 * this.scale, this.y + 98 * this.scale)   //stomach
+            fill(22, 65, 99) // blue
+            quad(this.currentX + 16 * this.scale, this.y + 98 * this.scale,
+                this.currentX + 24 * this.scale, this.y + 155 * this.scale,
+                this.currentX - 1 * this.scale, this.y + 155 * this.scale,
+                this.currentX - 40 * this.scale, this.y + 98 * this.scale)   //thigh
+            quad(this.currentX + 24 * this.scale, this.y + 155 * this.scale,
+                this.currentX - 3 * this.scale, this.y + 210 * this.scale,
+                this.currentX - 7 * this.scale, this.y + 210 * this.scale,
+                this.currentX - 1 * this.scale, this.y + 155 * this.scale)   //calf
+            fill(89, 59, 19)
+            quad(this.currentX - 40 * this.scale, this.y + 83 * this.scale,
+                this.currentX + 23 * this.scale, this.y + 83 * this.scale,
+                this.currentX + 14 * this.scale, this.y + 100 * this.scale,
+                this.currentX - 40 * this.scale, this.y + 100 * this.scale)   //belt
+            fill(161, 50, 50)
+            rect(this.currentX + 15 * this.scale, this.y - 46 * this.scale,
+                30 * this.scale, 20 * this.scale, 0, 5, 5, 20)   //chin
+            fill(255)
+            arc(this.currentX + 10 * this.scale, this.y - 63 * this.scale,
+                20 * this.scale, 20 * this.scale, 0, PI + QUARTER_PI, OPEN)  //eye
+            rect(this.currentX + 23 * this.scale, this.y - 39 * this.scale,
+                20 * this.scale, 7 * this.scale, 10, 10, 10, 0)   //teeth
+            fill(0)
+            ellipse( this.currentX + 12 * this.scale, this.y - 60 * this.scale, 10 * this.scale)    //iris
+            quad(this.currentX - 9 * this.scale, this.y - 67 * this.scale,
+                this.currentX - 16 * this.scale, this.y - 53 * this.scale,
+                this.currentX - 61 * this.scale, this.y - 62 * this.scale,
+                this.currentX - 55 * this.scale, this.y - 70 * this.scale)   //horn
+            triangle(this.currentX - 55 * this.scale, this.y - 70 * this.scale,
+                this.currentX - 20 * this.scale, this.y - 122 * this.scale,
+                this.currentX - 37 * this.scale, this.y - 66 * this.scale)     //horn
+            quad(this.currentX - 3 * this.scale, this.y + 210 * this.scale,
+                this.currentX + 20 * this.scale, this.y + 218 * this.scale,
+                this.currentX - 15 * this.scale, this.y + 218 * this.scale,
+                this.currentX - 7 * this.scale, this.y + 210 * this.scale)   //foot
+
+
+            fill(181, 42, 42)
+            rect(this.currentX - 17 * this.scale, this.y - 8 * this.scale,
+                30 * this.scale, 50 * this.scale, 10, 10, 10, 0)    //hand
+            quad(this.currentX + 14 * this.scale, this.y + 37 * this.scale,
+                this.currentX + 57 * this.scale, this.y + 53 * this.scale,
+                this.currentX + 50 * this.scale, this.y + 64 * this.scale,
+                this.currentX - 17 * this.scale, this.y + 43 * this.scale)    //hand
+            fill(138, 41, 41)
+            rect(this.currentX + 50 * this.scale, this.y + 52 * this.scale,
+                15 * this.scale, 15 * this.scale, 5)    //palm
         }
     }
-    this.checkContact = function(gc_x, gc_y){
-        if((gc_x > this.currentX - 50 * this.scale && gc_x < this.currentX + 65 * this.scale) &&
-           (gc_y > this.y - 122 * this.scale && gc_y < this.y + 310 * this.scale))
+    this.checkContact = function(gc_x, gc_y){ // gc read game character
+        // if touch the width or high of enemy return true
+        if((gc_x > this.currentX-50 * this.scale && gc_x < this.currentX + 65 * scale) &&
+          (gc_y > this.y - 122 * this.scale && gc_y < this.y + 310 * this.scale))
             return true;
         return false;
     }
 }
-
 function drawControllInfo() {
+    // this will draw the info how to move our LLama
     noStroke();
     fill(150,150,150,220);
     rect(230,450, 380,106,20);
@@ -669,44 +1162,4 @@ function drawControllInfo() {
     text("Jump: Space Bar or Up Arrow or W", 250, 480 + 60);
 }
 
-// --- HUD drawn in screen coordinates (after pop()) ---
-
-function drawLivesScreen() {
-    noStroke();
-    fill(235, 38, 38);
-    for (var i = 0; i < lives; i++) {
-        ellipse(i * 30 + 25, 25, 20, 20);
-        ellipse(i * 30 + 45, 25, 20, 20);
-        triangle(i * 30 + 14, 30, i * 30 + 37, 50, i * 30 + 59, 30)
-    }
-}
-
-function drawScoreScreen() {
-    push();
-    translate(width - 160, 8); // place at top-right
-    scale(0.6);
-    // draw a small coin icon
-    drawCollectable({pos_x: 0, pos_y: 40, scale: 0.4, isFound: false});
-    pop();
-    push();
-    fill(255);
-    textSize(22);
-    textAlign(LEFT, TOP);
-    text(game_score, width - 110, 18);
-    pop();
-}
-
-// --- zoom helpers ---
-function computeTargetZoom() {
-  const availW = windowWidth * (1 - marginFraction * 2);
-  const availH = windowHeight * (1 - marginFraction * 2);
-  const fitZoom = min(availW / GAME_W, availH / GAME_H);
-  const extraZoom = 1.0; // change to >1 to slightly over-zoom (may clip)
-  targetZoom = fitZoom * extraZoom;
-  targetZoom = constrain(targetZoom, 0.2, 6);
-}
-
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  computeTargetZoom();
-}
+// The end :)
